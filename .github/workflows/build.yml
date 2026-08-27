@@ -1,5 +1,19 @@
 name: Build
+- uses: actions/checkout@v4
 
+- uses: actions/setup-node@v4
+  with:
+    node-version: 22
+    cache: npm
+    cache-dependency-path: world-monitor-tactical/package-lock.json
+
+- name: Install dependencies
+  working-directory: world-monitor-tactical
+  run: npm ci
+
+- name: Build
+  working-directory: world-monitor-tactical
+  run: npm run build
 on:
   push:
     branches: [main]
