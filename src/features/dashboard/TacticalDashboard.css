@@ -77,6 +77,7 @@
 }
 
 .event-detail h3 {
+  margin-top: 8px;
   font-size: 0.95rem;
 }
 
@@ -153,6 +154,10 @@
 
 .category-conflict {
   background: #6a202a;
+}
+
+.category-disaster {
+  background: #3d2461;
 }
 
 .category-news {
