@@ -174,11 +174,11 @@ function calculateSeismicSeverity(
 function calculateNewsSeverity(title: string, summary: string): number {
   const allText = `${title} ${summary}`.toLowerCase();
 
-  if (/(breaking|urgent|attack|war|missile|guerre|attaque|frappe)/.test(allText)) {
+  if (/(breaking|urgent|attack|war|missile|guerre|attaque|frappe|catastrophe|meurtrier)/.test(allText)) {
     return 0.8;
   }
 
-  if (/(warning|sanction|protest|election|alerte|sanction|manifestation)/.test(allText)) {
+  if (/(warning|sanction|protest|election|alerte|sanction|manifestation|inondation|tempête|tornade)/.test(allText)) {
     return 0.45;
   }
 
@@ -188,9 +188,18 @@ function calculateNewsSeverity(title: string, summary: string): number {
 function inferCategory(title: string, summary: string): EventCategory {
   const allText = `${title} ${summary}`.toLowerCase();
 
-  return /(war|attack|missile|military|conflict|guerre|attaque|missile|conflit)/.test(allText)
-    ? 'conflict'
-    : 'news';
+  const conflictPattern = /(war|attack|missile|military|conflict|troops|strike|guerre|attaque|missile|conflit|armée|frappe|offensive)/;
+  const disasterPattern = /(flood|storm|tornado|wildfire|hurricane|cyclone|drought|eruption|volcano|landslide|inondation|tempête|tornade|incendie|feu de forêt|ouragan|cyclone|sécheresse|éruption|volcan|glissement de terrain|crue)/;
+
+  if (conflictPattern.test(allText)) {
+    return 'conflict';
+  }
+
+  if (disasterPattern.test(allText)) {
+    return 'disaster';
+  }
+
+  return 'news';
 }
 
 function extractLink(entry: Record<string, unknown>): string {
