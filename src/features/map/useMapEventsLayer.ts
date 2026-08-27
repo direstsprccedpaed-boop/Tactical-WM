@@ -88,6 +88,7 @@ function addLayersIfMissing(map: Map): void {
           ['get', 'category'],
           'seismic', '#f2994a',
           'conflict', '#eb5757',
+          'disaster', '#9b51e0',
           '#2f80ed',
         ],
         'circle-opacity': 0.9,
