@@ -1,34 +1,14 @@
 name: Build
-- uses: actions/checkout@v4
 
-- uses: actions/setup-node@v4
-  with:
-    node-version: 22
-    cache: npm
-    cache-dependency-path: world-monitor-tactical/package-lock.json
-
-- name: Install dependencies
-  working-directory: world-monitor-tactical
-  run: npm ci
-
-- name: Build
-  working-directory: world-monitor-tactical
-  run: npm run build
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:
 
 jobs:
   build:
-    name: Build web bundle
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: world-monitor-tactical
 
     steps:
       - name: Checkout
@@ -37,19 +17,21 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: 22
+          cache: npm
           cache-dependency-path: world-monitor-tactical/package-lock.json
 
       - name: Install dependencies
+        working-directory: world-monitor-tactical
         run: npm ci
 
-      - name: Type-check and build
+      - name: Build
+        working-directory: world-monitor-tactical
         run: npm run build
 
-      - name: Upload dist artifact
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: world-monitor-tactical-dist
+          name: dist
           path: world-monitor-tactical/dist
           retention-days: 7
