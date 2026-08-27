@@ -15,9 +15,9 @@ export interface RssSourceDefinition {
 
 export const RSS_SOURCES: RssSourceDefinition[] = [
   {
-    sourceId: 'bbc-world',
-    name: 'BBC World',
-    url: 'https://feeds.bbci.co.uk/news/world/rss.xml',
+    sourceId: 'rfi-monde',
+    name: 'RFI Monde',
+    url: 'https://www.rfi.fr/fr/monde/rss',
     freshnessTargetMs: 15 * 60 * 1_000,
     transport: 'native',
     priority: 70,
