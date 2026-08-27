@@ -47,7 +47,7 @@ interface EventStore {
 export const useEventStore = create<EventStore>()((set, get) => ({
   eventsById: {},
   filters: {
-    categories: ['seismic', 'conflict', 'news'],
+    categories: ['seismic', 'conflict', 'disaster', 'news'],
     minimumSeverity: 0,
   },
   sourceStatus: {},
