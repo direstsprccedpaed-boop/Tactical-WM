@@ -1,11 +1,21 @@
 import { useMemo, useState } from 'react';
 
 import { MapContainer } from '@/features/map/MapContainer';
+import type { EventCategory } from '@/core/domain/NormalizedEvent';
 import { useEventStore } from '@/stores/eventStore';
 
 import './TacticalDashboard.css';
 
 type CompactTab = 'map' | 'alerts';
+
+const CATEGORY_LABELS: Record<EventCategory, string> = {
+  seismic: 'Séisme',
+  conflict: 'Conflit',
+  disaster: 'Catastrophe',
+  news: 'Actualité',
+};
+
+const BASEMAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
 
 export function TacticalDashboard() {
   const [compactTab, setCompactTab] = useState<CompactTab>('map');
@@ -65,7 +75,7 @@ export function TacticalDashboard() {
         <section className="map-panel">
           <MapContainer
             className="map-canvas"
-            styleUrl="/map/style.json"
+            styleUrl={BASEMAP_STYLE_URL}
           />
         </section>
 
@@ -96,7 +106,7 @@ export function TacticalDashboard() {
                     onClick={() => selectEvent(event.id)}
                   >
                     <span className={`event-category category-${event.category}`}>
-                      {event.category}
+                      {CATEGORY_LABELS[event.category]}
                     </span>
                     <strong>{event.title}</strong>
                     <small>
@@ -113,6 +123,9 @@ export function TacticalDashboard() {
 
             {selectedEvent ? (
               <>
+                <span className={`event-category category-${selectedEvent.category}`}>
+                  {CATEGORY_LABELS[selectedEvent.category]}
+                </span>
                 <h3>{selectedEvent.title}</h3>
                 <p>{selectedEvent.summary || 'Aucun résumé disponible.'}</p>
                 <time dateTime={new Date(selectedEvent.timestamp).toISOString()}>
