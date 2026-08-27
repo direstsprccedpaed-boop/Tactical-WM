@@ -1,4 +1,4 @@
-export type EventCategory = 'seismic' | 'conflict' | 'news';
+export type EventCategory = 'seismic' | 'conflict' | 'disaster' | 'news';
 
 export interface NormalizedEvent {
   id: string;
