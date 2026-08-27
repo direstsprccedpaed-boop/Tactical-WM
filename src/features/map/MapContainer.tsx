@@ -48,7 +48,7 @@ export function MapContainer({
       zoom: lastCamera.zoom,
       bearing: lastCamera.bearing,
       pitch: lastCamera.pitch,
-      attributionControl: false,
+      attributionControl: { compact: true },
       fadeDuration: 0,
     });
 
