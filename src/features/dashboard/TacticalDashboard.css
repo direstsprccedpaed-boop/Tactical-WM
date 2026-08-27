@@ -1,0 +1,215 @@
+.tactical-dashboard {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: #07111f;
+  container-type: inline-size;
+  container-name: dashboard;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #1b2a3f;
+  background: #0b1728;
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.dashboard-header p {
+  margin: 3px 0 0;
+  color: #9fb0c7;
+  font-size: 0.78rem;
+}
+
+.dashboard-content {
+  display: grid;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.map-panel {
+  position: relative;
+  min-height: 0;
+  background: #101827;
+}
+
+.map-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.intelligence-rail {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid #1b2a3f;
+  background: #0b1728;
+}
+
+.alerts-panel,
+.event-detail {
+  padding: 12px;
+  overflow: auto;
+}
+
+.event-detail {
+  max-height: 38%;
+  border-top: 1px solid #1b2a3f;
+  background: #0d1b2e;
+}
+
+.alerts-panel h2,
+.event-detail h2,
+.event-detail h3 {
+  margin: 0 0 10px;
+}
+
+.event-detail h3 {
+  font-size: 0.95rem;
+}
+
+.event-detail p,
+.event-detail time,
+.event-detail a {
+  display: block;
+  color: #c9d5e5;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.event-detail a {
+  margin-top: 10px;
+  color: #66b7ff;
+}
+
+.panel-message {
+  color: #9fb0c7;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.error-message {
+  color: #ff9c9c;
+}
+
+.event-list {
+  display: grid;
+  gap: 7px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.event-list button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px;
+  color: #e8eef8;
+  text-align: left;
+  cursor: pointer;
+  background: #101f34;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.event-list button.is-selected {
+  border-color: #4ca5ff;
+  background: #132c4a;
+}
+
+.event-list strong {
+  font-size: 0.83rem;
+  line-height: 1.3;
+}
+
+.event-list small {
+  color: #9fb0c7;
+}
+
+.event-category {
+  width: fit-content;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.category-seismic {
+  background: #6b3f17;
+}
+
+.category-conflict {
+  background: #6a202a;
+}
+
+.category-news {
+  background: #1c4e78;
+}
+
+.compact-tabs {
+  display: none;
+}
+
+@container dashboard (min-width: 701px) {
+  .dashboard-content {
+    grid-template-columns: minmax(0, 65fr) minmax(300px, 35fr);
+  }
+}
+
+@container dashboard (max-width: 700px) {
+  .dashboard-content {
+    grid-template-columns: 1fr;
+  }
+
+  .compact-tabs {
+    display: flex;
+    gap: 6px;
+  }
+
+  .compact-tabs button {
+    padding: 7px 10px;
+    color: #aebed2;
+    cursor: pointer;
+    background: #101f34;
+    border: 1px solid #29425f;
+    border-radius: 6px;
+  }
+
+  .compact-tabs button.is-active {
+    color: #fff;
+    background: #1d4f80;
+    border-color: #4ca5ff;
+  }
+
+  .dashboard-content.compact-map .intelligence-rail,
+  .dashboard-content.compact-alerts .map-panel {
+    display: none;
+  }
+
+  .dashboard-content.compact-map .map-panel,
+  .dashboard-content.compact-alerts .intelligence-rail {
+    display: block;
+    min-height: 0;
+  }
+
+  .intelligence-rail {
+    border-left: 0;
+  }
+
+  .event-detail {
+    max-height: 42%;
+  }
+}
