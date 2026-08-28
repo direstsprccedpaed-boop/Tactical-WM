@@ -5,57 +5,80 @@ import type {
   MapLayerMouseEvent,
 } from 'maplibre-gl';
 
-import { eventStore, useEventStore } from '@/stores/eventStore';
+import {
+  DYNAMIC_LAYER_IDS,
+  eventStore,
+  useEventStore,
+  type MapLayerId,
+} from '@/stores/eventStore';
 
-const SOURCE_ID = 'events-source';
-const CLUSTER_LAYER_ID = 'events-clusters';
-const CLUSTER_COUNT_LAYER_ID = 'events-cluster-count';
-const POINT_LAYER_ID = 'events-points';
+const EVENT_SOURCE_IDS: Record<Exclude<MapLayerId, 'layer-infra'>, string> = {
+  'layer-seismic': 'source-seismic',
+  'layer-weather': 'source-weather',
+  'layer-news': 'source-news',
+};
 
-function addLayersIfMissing(map: Map): void {
-  if (!map.getSource(SOURCE_ID)) {
-    map.addSource(SOURCE_ID, {
+const CLUSTER_LAYER_SUFFIX = '-clusters';
+const CLUSTER_COUNT_SUFFIX = '-cluster-count';
+const POINT_LAYER_SUFFIX = '-points';
+
+const INFRA_SOURCE_ID = 'source-infra';
+const INFRA_LAYER_ID = 'layer-infra';
+const INFRA_DATA_URL = '/data/critical-infrastructure.geojson';
+
+const LAYER_PAINT: Record<
+  Exclude<MapLayerId, 'layer-infra'>,
+  { clusterColor: string; pointColor: string }
+> = {
+  'layer-seismic': { clusterColor: '#f2994a', pointColor: '#f2994a' },
+  'layer-weather': { clusterColor: '#9b51e0', pointColor: '#9b51e0' },
+  'layer-news': { clusterColor: '#2f80ed', pointColor: '#2f80ed' },
+};
+
+function ensureEventLayer(map: Map, layerId: Exclude<MapLayerId, 'layer-infra'>): void {
+  const sourceId = EVENT_SOURCE_IDS[layerId];
+  const clusterLayerId = `${layerId}${CLUSTER_LAYER_SUFFIX}`;
+  const clusterCountLayerId = `${layerId}${CLUSTER_COUNT_SUFFIX}`;
+  const pointLayerId = `${layerId}${POINT_LAYER_SUFFIX}`;
+  const palette = LAYER_PAINT[layerId];
+
+  if (!map.getSource(sourceId)) {
+    map.addSource(sourceId, {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: [] },
       cluster: true,
       clusterMaxZoom: 8,
-      clusterRadius: 48,
+      clusterRadius: 46,
     });
   }
 
-  if (!map.getLayer(CLUSTER_LAYER_ID)) {
+  if (!map.getLayer(clusterLayerId)) {
     map.addLayer({
-      id: CLUSTER_LAYER_ID,
+      id: clusterLayerId,
       type: 'circle',
-      source: SOURCE_ID,
+      source: sourceId,
       filter: ['has', 'point_count'],
       paint: {
-        'circle-color': [
-          'step',
-          ['get', 'point_count'],
-          '#2f80ed',
-          10, '#f2c94c',
-          50, '#eb5757',
-        ],
+        'circle-color': palette.clusterColor,
         'circle-radius': [
           'step',
           ['get', 'point_count'],
-          18,
-          10, 25,
-          50, 34,
+          16,
+          10, 23,
+          50, 32,
         ],
-        'circle-opacity': 0.88,
+        'circle-opacity': 0.85,
         'circle-stroke-color': '#ffffff',
         'circle-stroke-width': 1.5,
       },
     });
   }
 
-  if (!map.getLayer(CLUSTER_COUNT_LAYER_ID)) {
+  if (!map.getLayer(clusterCountLayerId)) {
     map.addLayer({
-      id: CLUSTER_COUNT_LAYER_ID,
+      id: clusterCountLayerId,
       type: 'symbol',
-      source: SOURCE_ID,
+      source: sourceId,
       filter: ['has', 'point_count'],
       layout: {
         'text-field': '{point_count_abbreviated}',
@@ -67,11 +90,11 @@ function addLayersIfMissing(map: Map): void {
     });
   }
 
-  if (!map.getLayer(POINT_LAYER_ID)) {
+  if (!map.getLayer(pointLayerId)) {
     map.addLayer({
-      id: POINT_LAYER_ID,
+      id: pointLayerId,
       type: 'circle',
-      source: SOURCE_ID,
+      source: sourceId,
       filter: ['!', ['has', 'point_count']],
       paint: {
         'circle-radius': [
@@ -81,17 +104,10 @@ function addLayersIfMissing(map: Map): void {
           0, 5,
           0.3, 8,
           0.6, 13,
-          1, 20,
+          1, 19,
         ],
-        'circle-color': [
-          'match',
-          ['get', 'category'],
-          'seismic', '#f2994a',
-          'conflict', '#eb5757',
-          'disaster', '#9b51e0',
-          '#2f80ed',
-        ],
-        'circle-opacity': 0.9,
+        'circle-color': palette.pointColor,
+        'circle-opacity': 0.92,
         'circle-stroke-color': '#ffffff',
         'circle-stroke-width': 1.3,
       },
@@ -99,23 +115,98 @@ function addLayersIfMissing(map: Map): void {
   }
 }
 
-export function restoreEventsLayer(map: Map): void {
-  if (!map.isStyleLoaded()) {
-    map.once('load', () => restoreEventsLayer(map));
+function ensureInfraLayer(map: Map): void {
+  if (!map.getSource(INFRA_SOURCE_ID)) {
+    map.addSource(INFRA_SOURCE_ID, {
+      type: 'geojson',
+      data: INFRA_DATA_URL,
+    });
+  }
+
+  if (!map.getLayer(INFRA_LAYER_ID)) {
+    map.addLayer({
+      id: INFRA_LAYER_ID,
+      type: 'circle',
+      source: INFRA_SOURCE_ID,
+      paint: {
+        'circle-radius': 6,
+        'circle-color': '#2ecc71',
+        'circle-opacity': 0.9,
+        'circle-stroke-color': '#07111f',
+        'circle-stroke-width': 1.5,
+      },
+    });
+  }
+}
+
+function applyLayerVisibility(map: Map, layerId: MapLayerId, active: boolean): void {
+  const visibility = active ? 'visible' : 'none';
+
+  if (layerId === 'layer-infra') {
+    if (map.getLayer(INFRA_LAYER_ID)) {
+      map.setLayoutProperty(INFRA_LAYER_ID, 'visibility', visibility);
+    }
     return;
   }
 
-  addLayersIfMissing(map);
+  const clusterLayerId = `${layerId}${CLUSTER_LAYER_SUFFIX}`;
+  const clusterCountLayerId = `${layerId}${CLUSTER_COUNT_SUFFIX}`;
+  const pointLayerId = `${layerId}${POINT_LAYER_SUFFIX}`;
 
-  const source = map.getSource(SOURCE_ID);
-
-  if (source?.type === 'geojson') {
-    (source as GeoJSONSource).setData(eventStore.getState().getGeoJson());
+  for (const id of [clusterLayerId, clusterCountLayerId, pointLayerId]) {
+    if (map.getLayer(id)) {
+      map.setLayoutProperty(id, 'visibility', visibility);
+    }
   }
+}
+
+function syncLayers(map: Map): void {
+  if (!map.isStyleLoaded()) {
+    map.once('load', () => syncLayers(map));
+    return;
+  }
+
+  const { activeLayers } = eventStore.getState();
+
+  for (const layerId of DYNAMIC_LAYER_IDS) {
+    ensureEventLayer(map, layerId);
+
+    const sourceId = EVENT_SOURCE_IDS[layerId];
+    const source = map.getSource(sourceId);
+
+    if (source?.type === 'geojson') {
+      (source as GeoJSONSource).setData(eventStore.getState().getLayerGeoJson(layerId));
+    }
+
+    applyLayerVisibility(map, layerId, activeLayers[layerId] ?? true);
+  }
+
+  // Couche statique paresseuse : on ne crée la source/layer qu'à la
+  // première activation par l'utilisateur (Round 1 — cold-start).
+  if (activeLayers['layer-infra']) {
+    ensureInfraLayer(map);
+  }
+
+  if (map.getLayer(INFRA_LAYER_ID)) {
+    applyLayerVisibility(map, 'layer-infra', activeLayers['layer-infra'] ?? false);
+  }
+}
+
+function pointLayerIds(): string[] {
+  return DYNAMIC_LAYER_IDS.map((layerId) => `${layerId}${POINT_LAYER_SUFFIX}`);
+}
+
+function clusterLayerIds(): string[] {
+  return DYNAMIC_LAYER_IDS.map((layerId) => `${layerId}${CLUSTER_LAYER_SUFFIX}`);
+}
+
+export function restoreEventsLayer(map: Map): void {
+  syncLayers(map);
 }
 
 export function useMapEventsLayer(map: Map | null): void {
   const eventsById = useEventStore((state) => state.eventsById);
+  const activeLayers = useEventStore((state) => state.activeLayers);
   const filters = useEventStore((state) => state.filters);
 
   useEffect(() => {
@@ -141,10 +232,16 @@ export function useMapEventsLayer(map: Map | null): void {
         return;
       }
 
+      const sourceId = feature.layer?.source;
       const clusterId = Number(feature.properties?.cluster_id);
-      const source = map.getSource(SOURCE_ID);
 
-      if (!Number.isFinite(clusterId) || source?.type !== 'geojson') {
+      if (!sourceId || !Number.isFinite(clusterId)) {
+        return;
+      }
+
+      const source = map.getSource(sourceId);
+
+      if (source?.type !== 'geojson') {
         return;
       }
 
@@ -162,32 +259,47 @@ export function useMapEventsLayer(map: Map | null): void {
       map.getCanvas().style.cursor = '';
     };
 
-    const restore = () => restoreEventsLayer(map);
+    const restore = () => syncLayers(map);
 
-    restoreEventsLayer(map);
+    syncLayers(map);
 
-    map.on('click', POINT_LAYER_ID, handlePointClick);
-    map.on('click', CLUSTER_LAYER_ID, handleClusterClick);
-    map.on('mouseenter', POINT_LAYER_ID, setPointer);
-    map.on('mouseenter', CLUSTER_LAYER_ID, setPointer);
-    map.on('mouseleave', POINT_LAYER_ID, clearPointer);
-    map.on('mouseleave', CLUSTER_LAYER_ID, clearPointer);
+    const pointIds = pointLayerIds();
+    const clusterIds = clusterLayerIds();
+
+    for (const layerId of pointIds) {
+      map.on('click', layerId, handlePointClick);
+      map.on('mouseenter', layerId, setPointer);
+      map.on('mouseleave', layerId, clearPointer);
+    }
+
+    for (const layerId of clusterIds) {
+      map.on('click', layerId, handleClusterClick);
+      map.on('mouseenter', layerId, setPointer);
+      map.on('mouseleave', layerId, clearPointer);
+    }
+
     map.on('webglcontextrestored', restore);
 
     return () => {
-      map.off('click', POINT_LAYER_ID, handlePointClick);
-      map.off('click', CLUSTER_LAYER_ID, handleClusterClick);
-      map.off('mouseenter', POINT_LAYER_ID, setPointer);
-      map.off('mouseenter', CLUSTER_LAYER_ID, setPointer);
-      map.off('mouseleave', POINT_LAYER_ID, clearPointer);
-      map.off('mouseleave', CLUSTER_LAYER_ID, clearPointer);
+      for (const layerId of pointIds) {
+        map.off('click', layerId, handlePointClick);
+        map.off('mouseenter', layerId, setPointer);
+        map.off('mouseleave', layerId, clearPointer);
+      }
+
+      for (const layerId of clusterIds) {
+        map.off('click', layerId, handleClusterClick);
+        map.off('mouseenter', layerId, setPointer);
+        map.off('mouseleave', layerId, clearPointer);
+      }
+
       map.off('webglcontextrestored', restore);
     };
   }, [map]);
 
   useEffect(() => {
     if (map) {
-      restoreEventsLayer(map);
+      syncLayers(map);
     }
-  }, [map, eventsById, filters]);
+  }, [map, eventsById, activeLayers, filters]);
 }
