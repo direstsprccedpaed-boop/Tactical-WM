@@ -50,6 +50,9 @@ jobs:
       - name: Sync Capacitor web assets into Android project
         run: npx cap sync android
 
+      - name: Generate app icons from resources/icon.png
+        run: npx capacitor-assets generate --android
+
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
