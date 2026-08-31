@@ -7,9 +7,19 @@ export type EventCategory =
   | 'conflict'
   | 'infrastructure'
   | 'disaster'
-  | 'news';
+  | 'news'
+  | 'energy'
+  | 'finance'
+  | 'diplomacy'
+  | 'tech_ai'
+  | 'space';
 
 export type AlertLevel = 'green' | 'orange' | 'red';
+
+/**
+ * Filtre temporel à chaud (Round 1). 'all' désactive toute coupure.
+ */
+export type TimeFilter = '3d' | '10d' | '30d' | 'all';
 
 export type EventGeometry =
   | { type: 'Point'; coordinates: [number, number] }
@@ -28,25 +38,10 @@ export interface NormalizedEvent {
   category: EventCategory;
   rawUrl: string;
 
-  /**
-   * Champs enrichis (Round 2). Tous optionnels afin de garantir la
-   * rétrocompatibilité avec les lignes déjà persistées dans Dexie par les
-   * adaptateurs existants (USGS, RSS) qui ne les renseignent pas.
-   */
   alertLevel?: AlertLevel;
   sourceLabel?: string;
   countryLabel?: string;
   startTime?: number;
   endTime?: number;
-
-  /**
-   * Géométrie étendue (polygone de tempête/feu, tracé linéaire, etc.).
-   * Non alimenté par l'adaptateur GDACS actuel (qui ne remonte que le
-   * centroïde ponctuel via l'endpoint de liste, afin d'éviter un fan-out
-   * N+1 de requêtes vers l'endpoint de géométrie détaillée pendant la
-   * synchronisation en tâche de fond — voir Round 1). Prévu comme point
-   * d'extension pour une récupération à la demande, lors de l'ouverture
-   * du détail d'un évènement spécifique.
-   */
   polygon?: EventGeometry | null;
 }
