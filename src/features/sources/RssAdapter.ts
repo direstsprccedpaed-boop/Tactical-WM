@@ -1,6 +1,7 @@
 import { httpTransport } from '@/core/net/HttpTransport';
 import type { ScheduledTask } from '@/core/net/Scheduler';
 import { parserClient } from '@/core/parsing/ParserClient';
+import type { SourceLanguage } from '@/core/domain/NormalizedEvent';
 import { db } from '@/core/storage/db';
 import { eventStore } from '@/stores/eventStore';
 
@@ -11,15 +12,22 @@ export interface RssSourceDefinition {
   freshnessTargetMs: number;
   transport: 'native';
   priority: number;
+  /**
+   * Langue native du flux. Détermine si le contenu doit être proposé à la
+   * traduction côté affichage (Round 1) — jamais pour du contenu déjà
+   * francophone.
+   */
+  language: SourceLanguage;
 }
 
 /**
  * Sources RSS vérifiées gratuites, sans clé, compatibles CapacitorHttp.
- * Aucune source "Finance/Marchés" dédiée n'a pu être ajoutée avec une URL
- * garantie stable (Bloomberg a fermé son RSS public, Investing.com exige
- * une inscription webmaster) — le pilier finance reste alimenté par
- * classification thématique du contenu des flux ci-dessous en attendant
- * une source qualifiée.
+ *
+ * NB : une source "CNBC World Economy/Markets" avait été demandée mais
+ * aucune URL RSS CNBC vérifiable n'a pu être confirmée (ni via recherche,
+ * ni via requête directe) au moment de cette intégration — elle est donc
+ * volontairement omise plutôt que fabriquée. Si tu disposes de l'URL
+ * exacte, elle s'ajoute au tableau ci-dessous selon le même schéma.
  */
 export const RSS_SOURCES: RssSourceDefinition[] = [
   {
@@ -29,6 +37,7 @@ export const RSS_SOURCES: RssSourceDefinition[] = [
     freshnessTargetMs: 15 * 60 * 1_000,
     transport: 'native',
     priority: 70,
+    language: 'fr',
   },
   {
     sourceId: 'nasa-breaking-news',
@@ -37,6 +46,7 @@ export const RSS_SOURCES: RssSourceDefinition[] = [
     freshnessTargetMs: 30 * 60 * 1_000,
     transport: 'native',
     priority: 60,
+    language: 'en',
   },
   {
     sourceId: 'techcrunch-ai',
@@ -45,6 +55,7 @@ export const RSS_SOURCES: RssSourceDefinition[] = [
     freshnessTargetMs: 20 * 60 * 1_000,
     transport: 'native',
     priority: 55,
+    language: 'en',
   },
   {
     sourceId: 'oilprice-main',
@@ -53,6 +64,25 @@ export const RSS_SOURCES: RssSourceDefinition[] = [
     freshnessTargetMs: 30 * 60 * 1_000,
     transport: 'native',
     priority: 55,
+    language: 'en',
+  },
+  {
+    sourceId: 'marketwatch-commodities',
+    name: 'MarketWatch Commodities',
+    url: 'https://feeds.content.dowjones.io/public/rss/mw_commodities',
+    freshnessTargetMs: 15 * 60 * 1_000,
+    transport: 'native',
+    priority: 65,
+    language: 'en',
+  },
+  {
+    sourceId: 'boursier-com',
+    name: 'Boursier.com',
+    url: 'https://www.boursier.com/rss/news/actualites.xml',
+    freshnessTargetMs: 15 * 60 * 1_000,
+    transport: 'native',
+    priority: 65,
+    language: 'fr',
   },
 ];
 
@@ -95,11 +125,20 @@ export function createRssTask(
         throw new Error(`${source.name} HTTP ${response.status}`);
       }
 
-      const events = await parserClient.parse(
+      const parsedEvents = await parserClient.parse(
         'rss-atom',
         source.sourceId,
         response.bodyText,
       );
+
+      // La langue native de la source est connue ici (métadonnée
+      // d'adaptateur), pas dans le Worker de parsing structurel : on
+      // l'attache après coup plutôt que d'étendre le protocole du Worker.
+      const events = parsedEvents.map((event) => ({
+        ...event,
+        sourceLanguage: source.language,
+        sourceLabel: event.sourceLabel ?? source.name,
+      }));
 
       await db.upsertEvents(events);
 
