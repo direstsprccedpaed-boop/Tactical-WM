@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type {
   EventCategory,
   NormalizedEvent,
+  TimeFilter,
 } from '@/core/domain/NormalizedEvent';
 import { db } from '@/core/storage/db';
 
@@ -12,7 +13,12 @@ export type MapLayerId =
   | 'layer-seismic'
   | 'layer-weather'
   | 'layer-news'
-  | 'layer-infra';
+  | 'layer-infra'
+  | 'layer-energy'
+  | 'layer-finance'
+  | 'layer-diplomacy'
+  | 'layer-tech'
+  | 'layer-space';
 
 export type BoundsTuple = [west: number, south: number, east: number, north: number];
 
@@ -42,11 +48,9 @@ export interface LayerGeoJson extends GeoJSON.FeatureCollection<
 > {}
 
 /**
- * Table de routage catégorie → couche MapLibre dédiée (Round 2/3).
- * `null` signifie que la catégorie n'est pour l'instant portée par aucune
- * des couches dynamiques (cas de `infrastructure`, réservé à un futur flux
- * d'incidents dédié plutôt qu'à la couche statique `layer-infra`, qui elle
- * n'est jamais alimentée depuis Dexie/Zustand).
+ * Table de routage catégorie → couche MapLibre dédiée. Point unique de
+ * vérité partagé par le store, le hook carte et le tableau de bord — un
+ * futur pilier ne nécessite qu'une entrée ici, jamais de nouveau type.
  */
 export const CATEGORY_TO_LAYER: Record<EventCategory, MapLayerId | null> = {
   seismic: 'layer-seismic',
@@ -58,17 +62,38 @@ export const CATEGORY_TO_LAYER: Record<EventCategory, MapLayerId | null> = {
   conflict: 'layer-news',
   news: 'layer-news',
   infrastructure: null,
+  energy: 'layer-energy',
+  finance: 'layer-finance',
+  diplomacy: 'layer-diplomacy',
+  tech_ai: 'layer-tech',
+  space: 'layer-space',
 };
 
-const DYNAMIC_LAYER_IDS: Exclude<MapLayerId, 'layer-infra'>[] = [
+export const DYNAMIC_LAYER_IDS: Exclude<MapLayerId, 'layer-infra'>[] = [
   'layer-seismic',
   'layer-weather',
   'layer-news',
+  'layer-energy',
+  'layer-finance',
+  'layer-diplomacy',
+  'layer-tech',
+  'layer-space',
 ];
+
+const TIME_FILTER_MS: Record<TimeFilter, number | null> = {
+  '3d': 3 * 24 * 60 * 60 * 1_000,
+  '10d': 10 * 24 * 60 * 60 * 1_000,
+  '30d': 30 * 24 * 60 * 60 * 1_000,
+  all: null,
+};
 
 interface EventStore {
   eventsById: Record<string, NormalizedEvent>;
+  /** Ids triés par timestamp décroissant, recalculé uniquement lors des
+   *  écritures de données (sync), jamais lors des interactions de filtre. */
+  orderedIds: string[];
   filters: EventFilters;
+  timeFilter: TimeFilter;
   activeLayers: Record<MapLayerId, boolean>;
   visibleBounds: BoundsTuple | null;
   viewportFilterEnabled: boolean;
@@ -81,6 +106,7 @@ interface EventStore {
   hydrateFromCache: () => Promise<void>;
   upsertEvents: (events: NormalizedEvent[]) => void;
   setFilters: (filters: Partial<EventFilters>) => void;
+  setTimeFilter: (timeFilter: TimeFilter) => void;
   setSourceStatus: (sourceId: string, status: SourceStatus) => void;
   selectEvent: (eventId: string | null) => void;
   toggleLayer: (layerId: MapLayerId) => void;
@@ -105,8 +131,6 @@ function isWithinBounds(
     return false;
   }
 
-  // Cas simple, sans déroulement à l'antiméridien : suffisant pour un
-  // tableau de bord tactique généraliste ; documenté comme limite connue.
   if (west <= east) {
     return longitude >= west && longitude <= east;
   }
@@ -114,16 +138,58 @@ function isWithinBounds(
   return longitude >= west || longitude <= east;
 }
 
+function buildOrderedIds(eventsById: Record<string, NormalizedEvent>): string[] {
+  return Object.keys(eventsById).sort(
+    (a, b) => eventsById[b].timestamp - eventsById[a].timestamp,
+  );
+}
+
+/**
+ * Recherche binaire de la frontière de coupure temporelle sur un tableau
+ * d'ids déjà triés par timestamp décroissant. Retourne l'index du premier
+ * id dont le timestamp est strictement antérieur au seuil : slice(0, index)
+ * donne alors tous les évènements récents en O(log n), sans balayage
+ * linéaire complet à chaque changement de filtre.
+ */
+function findCutoffIndex(
+  orderedIds: string[],
+  eventsById: Record<string, NormalizedEvent>,
+  cutoffTimestamp: number,
+): number {
+  let low = 0;
+  let high = orderedIds.length;
+
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    const event = eventsById[orderedIds[mid]];
+
+    if (event.timestamp >= cutoffTimestamp) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+
+  return low;
+}
+
 export const useEventStore = create<EventStore>()((set, get) => ({
   eventsById: {},
+  orderedIds: [],
   filters: {
     minimumSeverity: 0,
   },
+  timeFilter: 'all',
   activeLayers: {
     'layer-seismic': true,
     'layer-weather': true,
     'layer-news': true,
     'layer-infra': false,
+    'layer-energy': true,
+    'layer-finance': true,
+    'layer-diplomacy': true,
+    'layer-tech': true,
+    'layer-space': true,
   },
   visibleBounds: null,
   viewportFilterEnabled: false,
@@ -136,9 +202,12 @@ export const useEventStore = create<EventStore>()((set, get) => ({
   hydrateFromCache: async () => {
     try {
       const events = await db.events.orderBy('timestamp').reverse().toArray();
+      const eventsById = Object.fromEntries(events.map((event) => [event.id, event]));
 
       set({
-        eventsById: Object.fromEntries(events.map((event) => [event.id, event])),
+        eventsById,
+        // Déjà trié par la requête Dexie : simple projection, pas de tri.
+        orderedIds: events.map((event) => event.id),
         hydrated: true,
         hydrationError: null,
       });
@@ -153,14 +222,28 @@ export const useEventStore = create<EventStore>()((set, get) => ({
   },
 
   upsertEvents: (events) => {
+    if (events.length === 0) {
+      return;
+    }
+
     set((state) => {
       const eventsById = { ...state.eventsById };
+      let structureChanged = false;
 
       for (const event of events) {
+        const existing = eventsById[event.id];
+
+        if (!existing || existing.timestamp !== event.timestamp) {
+          structureChanged = true;
+        }
+
         eventsById[event.id] = event;
       }
 
-      return { eventsById };
+      return {
+        eventsById,
+        orderedIds: structureChanged ? buildOrderedIds(eventsById) : state.orderedIds,
+      };
     });
   },
 
@@ -176,6 +259,8 @@ export const useEventStore = create<EventStore>()((set, get) => ({
       },
     }));
   },
+
+  setTimeFilter: (timeFilter) => set({ timeFilter }),
 
   setSourceStatus: (sourceId, status) => {
     set((state) => ({
@@ -233,15 +318,37 @@ export const useEventStore = create<EventStore>()((set, get) => ({
   clearFlyToRequest: () => set({ flyToRequest: null }),
 
   getListEvents: () => {
-    const { eventsById, filters, activeLayers } = get();
+    const { eventsById, orderedIds, filters, activeLayers, timeFilter } = get();
+    const cutoffMs = TIME_FILTER_MS[timeFilter];
+    const cutoffTimestamp = cutoffMs === null ? null : Date.now() - cutoffMs;
 
-    return Object.values(eventsById)
-      .filter((event) => {
-        const layerId = CATEGORY_TO_LAYER[event.category];
-        return layerId !== null && activeLayers[layerId];
-      })
-      .filter((event) => event.severity >= filters.minimumSeverity)
-      .sort((a, b) => b.timestamp - a.timestamp);
+    const relevantIds = cutoffTimestamp === null
+      ? orderedIds
+      : orderedIds.slice(0, findCutoffIndex(orderedIds, eventsById, cutoffTimestamp));
+
+    const results: NormalizedEvent[] = [];
+
+    for (const id of relevantIds) {
+      const event = eventsById[id];
+
+      if (!event) {
+        continue;
+      }
+
+      const layerId = CATEGORY_TO_LAYER[event.category];
+
+      if (layerId === null || !activeLayers[layerId]) {
+        continue;
+      }
+
+      if (event.severity < filters.minimumSeverity) {
+        continue;
+      }
+
+      results.push(event);
+    }
+
+    return results;
   },
 
   getVisibleListEvents: () => {
@@ -295,4 +402,3 @@ export const useEventStore = create<EventStore>()((set, get) => ({
 }));
 
 export const eventStore = useEventStore;
-export { DYNAMIC_LAYER_IDS };
