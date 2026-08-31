@@ -13,6 +13,14 @@ export interface RssSourceDefinition {
   priority: number;
 }
 
+/**
+ * Sources RSS vérifiées gratuites, sans clé, compatibles CapacitorHttp.
+ * Aucune source "Finance/Marchés" dédiée n'a pu être ajoutée avec une URL
+ * garantie stable (Bloomberg a fermé son RSS public, Investing.com exige
+ * une inscription webmaster) — le pilier finance reste alimenté par
+ * classification thématique du contenu des flux ci-dessous en attendant
+ * une source qualifiée.
+ */
 export const RSS_SOURCES: RssSourceDefinition[] = [
   {
     sourceId: 'rfi-monde',
@@ -21,6 +29,30 @@ export const RSS_SOURCES: RssSourceDefinition[] = [
     freshnessTargetMs: 15 * 60 * 1_000,
     transport: 'native',
     priority: 70,
+  },
+  {
+    sourceId: 'nasa-breaking-news',
+    name: 'NASA',
+    url: 'https://www.nasa.gov/rss/dyn/breaking_news.rss',
+    freshnessTargetMs: 30 * 60 * 1_000,
+    transport: 'native',
+    priority: 60,
+  },
+  {
+    sourceId: 'techcrunch-ai',
+    name: 'TechCrunch IA',
+    url: 'https://techcrunch.com/category/artificial-intelligence/feed/',
+    freshnessTargetMs: 20 * 60 * 1_000,
+    transport: 'native',
+    priority: 55,
+  },
+  {
+    sourceId: 'oilprice-main',
+    name: 'OilPrice.com',
+    url: 'https://oilprice.com/rss/main',
+    freshnessTargetMs: 30 * 60 * 1_000,
+    transport: 'native',
+    priority: 55,
   },
 ];
 
