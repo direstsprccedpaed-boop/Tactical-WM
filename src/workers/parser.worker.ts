@@ -174,11 +174,11 @@ function calculateSeismicSeverity(
 function calculateNewsSeverity(title: string, summary: string): number {
   const allText = `${title} ${summary}`.toLowerCase();
 
-  if (/(breaking|urgent|attack|war|missile|guerre|attaque|frappe|catastrophe|meurtrier|crash|effondrement)/.test(allText)) {
+  if (/(breaking|urgent|attack|war|missile|guerre|attaque|frappe|catastrophe|meurtrier|crash|effondrement|plunge|soars?|crisis|crise)/.test(allText)) {
     return 0.8;
   }
 
-  if (/(warning|sanction|protest|election|alerte|sanction|manifestation|inondation|tempête|tornade|pénurie|rupture)/.test(allText)) {
+  if (/(warning|sanction|protest|election|alerte|sanction|manifestation|inondation|tempête|tornade|pénurie|rupture|volatil|rate hike|hausse des taux)/.test(allText)) {
     return 0.45;
   }
 
@@ -186,10 +186,19 @@ function calculateNewsSeverity(title: string, summary: string): number {
 }
 
 /**
- * Moteur d'inférence thématique. Ordre de priorité volontaire : les motifs
- * les plus critiques et les plus spécifiques (conflit, catastrophe) sont
- * évalués avant les piliers plus généraux (diplomatie, finance) afin de
- * limiter les faux positifs sur du vocabulaire ambigu ("tension", "crise").
+ * Moteur d'inférence thématique. Ordre de priorité volontaire : conflit
+ * et catastrophe (motifs les plus critiques et les moins ambigus) sont
+ * évalués avant les piliers plus généraux, afin de limiter les faux
+ * positifs sur du vocabulaire partagé ("crise", "tension").
+ *
+ * Round 3 : les motifs énergie/finance ont été enrichis de vocabulaire
+ * spécifique aux matières premières et aux marchés (WTI, Brent, once
+ * d'or, CAC 40, taux directeur…) pour classifier de façon déterministe
+ * les flux MarketWatch Commodities et Boursier.com sans avoir à faire
+ * transiter un indice de catégorie à travers le protocole du Worker.
+ * Le terme français "or" est volontairement exclu des motifs bruts
+ * (ambigu avec la conjonction "or") ; seules des locutions composées
+ * univoques sont retenues (once d'or, cours de l'or, lingot d'or).
  */
 function inferCategory(title: string, summary: string): EventCategory {
   const allText = `${title} ${summary}`.toLowerCase();
@@ -198,9 +207,9 @@ function inferCategory(title: string, summary: string): EventCategory {
   const disasterPattern = /(flood|storm|tornado|wildfire|hurricane|cyclone|drought|eruption|volcano|landslide|inondation|tempête|tornade|incendie|feu de forêt|ouragan|cyclone|sécheresse|éruption|volcan|glissement de terrain|crue)/;
   const spacePattern = /(rocket|satellite|launch|orbit|nasa|spacex|esa|starship|falcon 9|fusée|satellite|lancement|orbite|spatial(e)?|astronaute|iss\b)/;
   const techAiPattern = /(chip|semiconductor|nvidia|artificial intelligence|\bai\b|gpu|processor|puce|semi-conducteur|intelligence artificielle|\bia\b|processeur|algorithme|data center|centre de données)/;
-  const energyPattern = /(oil|barrel|opec|pipeline|refinery|natural gas|pétrole|baril|opep|pipeline|raffinerie|gaz naturel|énergie|nucléaire|nuclear plant)/;
+  const energyPattern = /(oil|barrel|opec|pipeline|refinery|natural gas|crude|wti\b|brent\b|commodit(y|ies)|pétrole|baril|opep|pipeline|raffinerie|gaz naturel|énergie|nucléaire|nuclear plant|matières premières|cours du pétrole|cours du gaz|once d'or|lingot d'or|cours de l'or|cuivre|copper|argent métal)/;
   const diplomacyPattern = /(summit|treaty|embassy|ambassador|diplomat|negotiation|sommet|traité|ambassade|diplomat(e|ique)|négociation|accord bilatéral|sanctions? diplomatique)/;
-  const financePattern = /(stock market|inflation|central bank|gdp|interest rate|bourse|inflation|banque centrale|pib\b|taux d'intérêt|marché boursier|obligation(s)? d'état)/;
+  const financePattern = /(stock market|inflation|central bank|gdp|interest rate|rate hike|forex|currency|wall street|dow jones|nasdaq\b|bourse|inflation|banque centrale|pib\b|taux d'intérêt|taux directeur|marché boursier|marché(s)? financier|obligation(s)? d'état|cac 40|indice boursier|devise)/;
 
   if (conflictPattern.test(allText)) {
     return 'conflict';
@@ -313,7 +322,29 @@ function parseDate(value: string, fallback: number): number {
 }
 
 function stripHtml(value: string): string {
-  return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  return decodeHtmlEntities(value.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
+}
+
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+  mdash: '—',
+  ndash: '–',
+  rsquo: '’',
+  lsquo: '‘',
+  ldquo: '“',
+  rdquo: '”',
+};
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&([a-z]+);/gi, (match, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? match);
 }
 
 function text(value: unknown): string {
