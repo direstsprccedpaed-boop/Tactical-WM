@@ -6,7 +6,6 @@ import type {
 } from 'maplibre-gl';
 
 import {
-  DYNAMIC_LAYER_IDS,
   eventStore,
   useEventStore,
   type MapLayerId,
@@ -16,7 +15,30 @@ const EVENT_SOURCE_IDS: Record<Exclude<MapLayerId, 'layer-infra'>, string> = {
   'layer-seismic': 'source-seismic',
   'layer-weather': 'source-weather',
   'layer-news': 'source-news',
+  'layer-energy': 'source-energy',
+  'layer-finance': 'source-finance',
+  'layer-diplomacy': 'source-diplomacy',
+  'layer-tech': 'source-tech',
+  'layer-space': 'source-space',
 };
+
+/**
+ * Ordre de création des couches = ordre d'empilement visuel dans MapLibre
+ * (chaque addLayer() place la couche au-dessus des précédentes). Les
+ * catastrophes naturelles restent en fond, les piliers à faible densité
+ * de points (tech/IA, espace) sont placés au sommet pour ne jamais être
+ * masqués par des clusters denses d'actualités.
+ */
+const LAYER_STACK_ORDER: Exclude<MapLayerId, 'layer-infra'>[] = [
+  'layer-weather',
+  'layer-seismic',
+  'layer-energy',
+  'layer-finance',
+  'layer-diplomacy',
+  'layer-news',
+  'layer-tech',
+  'layer-space',
+];
 
 const CLUSTER_LAYER_SUFFIX = '-clusters';
 const CLUSTER_COUNT_SUFFIX = '-cluster-count';
@@ -33,6 +55,11 @@ const LAYER_PAINT: Record<
   'layer-seismic': { clusterColor: '#f2994a', pointColor: '#f2994a' },
   'layer-weather': { clusterColor: '#9b51e0', pointColor: '#9b51e0' },
   'layer-news': { clusterColor: '#2f80ed', pointColor: '#2f80ed' },
+  'layer-energy': { clusterColor: '#f2c94c', pointColor: '#f2c94c' },
+  'layer-finance': { clusterColor: '#27ae60', pointColor: '#27ae60' },
+  'layer-diplomacy': { clusterColor: '#56ccf2', pointColor: '#56ccf2' },
+  'layer-tech': { clusterColor: '#bb6bd9', pointColor: '#bb6bd9' },
+  'layer-space': { clusterColor: '#e0e6f0', pointColor: '#e0e6f0' },
 };
 
 function ensureEventLayer(map: Map, layerId: Exclude<MapLayerId, 'layer-infra'>): void {
@@ -168,7 +195,7 @@ function syncLayers(map: Map): void {
 
   const { activeLayers } = eventStore.getState();
 
-  for (const layerId of DYNAMIC_LAYER_IDS) {
+  for (const layerId of LAYER_STACK_ORDER) {
     ensureEventLayer(map, layerId);
 
     const sourceId = EVENT_SOURCE_IDS[layerId];
@@ -181,8 +208,6 @@ function syncLayers(map: Map): void {
     applyLayerVisibility(map, layerId, activeLayers[layerId] ?? true);
   }
 
-  // Couche statique paresseuse : on ne crée la source/layer qu'à la
-  // première activation par l'utilisateur (Round 1 — cold-start).
   if (activeLayers['layer-infra']) {
     ensureInfraLayer(map);
   }
@@ -193,11 +218,11 @@ function syncLayers(map: Map): void {
 }
 
 function pointLayerIds(): string[] {
-  return DYNAMIC_LAYER_IDS.map((layerId) => `${layerId}${POINT_LAYER_SUFFIX}`);
+  return LAYER_STACK_ORDER.map((layerId) => `${layerId}${POINT_LAYER_SUFFIX}`);
 }
 
 function clusterLayerIds(): string[] {
-  return DYNAMIC_LAYER_IDS.map((layerId) => `${layerId}${CLUSTER_LAYER_SUFFIX}`);
+  return LAYER_STACK_ORDER.map((layerId) => `${layerId}${CLUSTER_LAYER_SUFFIX}`);
 }
 
 export function restoreEventsLayer(map: Map): void {
