@@ -49,28 +49,28 @@
   height: 100%;
 }
 
-/* Contrôleur tactique : toujours un overlay flottant au-dessus de la
-   carte, jamais une colonne de grille — la zone d'observation reste
-   maximale sur tous les formats (Round 3). */
+/* Contrôleur tactique ancré en bas : reste accessible au pouce en tenue
+   à deux mains sur l'écran interne déplié, et laisse le haut de la carte
+   totalement dégagé pour l'observation (Round 3). */
 .tactical-controller {
   position: absolute;
-  top: 10px;
+  bottom: 10px;
   left: 10px;
+  right: 10px;
   z-index: 5;
-  max-width: 240px;
   overflow: hidden;
   color: #e8eef8;
-  background: rgba(11, 23, 40, 0.88);
+  background: rgba(11, 23, 40, 0.92);
   border: 1px solid #29425f;
-  border-radius: 10px;
+  border-radius: 12px;
   backdrop-filter: blur(6px);
 }
 
 .tactical-controller-toggle {
   width: 100%;
-  padding: 8px 10px;
+  padding: 9px 12px;
   color: #e8eef8;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
@@ -81,30 +81,54 @@
 .tactical-controller-body {
   display: grid;
   gap: 10px;
-  padding: 0 10px 10px;
+  padding: 0 12px 12px;
+  max-height: 45vh;
+  overflow-y: auto;
 }
 
-.layer-toggle-list {
-  display: grid;
-  gap: 6px;
-  padding: 0;
-  margin: 0;
-  border: none;
-}
-
-.layer-toggle-list legend {
-  padding: 0;
-  margin-bottom: 2px;
-  color: #9fb0c7;
-  font-size: 0.68rem;
-  text-transform: uppercase;
-}
-
-.layer-toggle {
+.time-filter-row {
   display: flex;
-  align-items: center;
   gap: 6px;
-  font-size: 0.78rem;
+}
+
+.time-chip {
+  flex: 1;
+  padding: 7px 4px;
+  color: #aebed2;
+  font-size: 0.75rem;
+  text-align: center;
+  cursor: pointer;
+  background: #101f34;
+  border: 1px solid #29425f;
+  border-radius: 999px;
+}
+
+.time-chip.is-active {
+  color: #fff;
+  background: #1d4f80;
+  border-color: #4ca5ff;
+}
+
+.layer-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.layer-badge {
+  padding: 6px 10px;
+  color: #aebed2;
+  font-size: 0.72rem;
+  cursor: pointer;
+  background: #101f34;
+  border: 1px solid #29425f;
+  border-radius: 999px;
+}
+
+.layer-badge.is-active {
+  color: #07111f;
+  background: #d9e6f5;
+  border-color: #d9e6f5;
 }
 
 .severity-control {
@@ -140,7 +164,7 @@
 }
 
 .event-detail {
-  max-height: 38%;
+  max-height: 46%;
   border-top: 1px solid #1b2a3f;
   background: #0d1b2e;
 }
@@ -152,8 +176,42 @@
 }
 
 .event-detail h3 {
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: 0.95rem;
+}
+
+.detail-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detail-source {
+  color: #9fb0c7;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.severity-gauge {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+  font-size: 0.78rem;
+}
+
+.severity-gauge-track {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  background: #101f34;
+  border-radius: 999px;
+}
+
+.severity-gauge-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.2s ease;
 }
 
 .event-detail p,
@@ -165,8 +223,41 @@
   line-height: 1.45;
 }
 
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.tag-chip {
+  padding: 3px 8px;
+  color: #9fb0c7;
+  font-size: 0.7rem;
+  background: #101f34;
+  border: 1px solid #29425f;
+  border-radius: 999px;
+}
+
+.detail-metadata {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  margin: 10px 0;
+  font-size: 0.8rem;
+}
+
+.detail-metadata dt {
+  color: #9fb0c7;
+}
+
+.detail-metadata dd {
+  margin: 0;
+  color: #e8eef8;
+}
+
 .event-detail a {
-  margin-top: 10px;
+  margin-top: 6px;
   color: #66b7ff;
 }
 
@@ -241,7 +332,7 @@
 }
 
 .event-row small {
-  color: #9fb0c7;
+  font-weight: 600;
 }
 
 .event-category {
@@ -276,6 +367,26 @@
   background: #1c4e78;
 }
 
+.category-energy {
+  background: #6b5a12;
+}
+
+.category-finance {
+  background: #1a5c37;
+}
+
+.category-diplomacy {
+  background: #175a68;
+}
+
+.category-tech_ai {
+  background: #4a1f63;
+}
+
+.category-space {
+  background: #3a3f4d;
+}
+
 .compact-tabs {
   display: none;
 }
@@ -288,16 +399,18 @@
 
 @container dashboard (min-width: 900px) {
   .tactical-controller {
-    max-width: 280px;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
   }
 
   .tactical-controller-toggle {
-    padding: 10px 12px;
+    padding: 11px 14px;
     font-size: 0.85rem;
   }
 
   .tactical-controller-body {
-    padding: 0 12px 12px;
+    padding: 0 14px 14px;
   }
 }
 
@@ -342,10 +455,6 @@
   }
 
   .event-detail {
-    max-height: 42%;
-  }
-
-  .tactical-controller {
-    max-width: 200px;
+    max-height: 48%;
   }
 }
