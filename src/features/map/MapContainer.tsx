@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import maplibregl, { type Map } from 'maplibre-gl';
+import maplibregl, { type GeoJSONSource, type Map } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { useMapEventsLayer } from '@/features/map/useMapEventsLayer';
@@ -65,6 +65,29 @@ function ensureThreatCircleLayers(map: Map): void {
       },
     });
   }
+}
+
+function setThreatCircleData(
+  map: Map,
+  centerLatitude: number,
+  centerLongitude: number,
+  radiusKm: number,
+  label: string,
+): void {
+  const source = map.getSource(THREAT_SOURCE_ID);
+
+  if (!source || source.type !== 'geojson') {
+    return;
+  }
+
+  (source as GeoJSONSource).setData({
+    type: 'FeatureCollection',
+    features: [{
+      type: 'Feature',
+      properties: { label },
+      geometry: buildCirclePolygon(centerLatitude, centerLongitude, radiusKm),
+    }],
+  });
 }
 
 export function MapContainer({
@@ -207,23 +230,13 @@ export function MapContainer({
 
         const runFocus = () => {
           ensureThreatCircleLayers(instance);
-
-          const source = instance.getSource(THREAT_SOURCE_ID);
-
-          if (source?.type === 'geojson') {
-            source.setData({
-              type: 'FeatureCollection',
-              features: [{
-                type: 'Feature',
-                properties: { label: request.label },
-                geometry: buildCirclePolygon(
-                  request.centerLatitude,
-                  request.centerLongitude,
-                  request.radiusKm,
-                ),
-              }],
-            });
-          }
+          setThreatCircleData(
+            instance,
+            request.centerLatitude,
+            request.centerLongitude,
+            request.radiusKm,
+            request.label,
+          );
 
           const [west, south, east, north] = request.bounds;
 
