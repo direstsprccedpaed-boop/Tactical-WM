@@ -16,10 +16,9 @@ export type EventCategory =
 
 export type AlertLevel = 'green' | 'orange' | 'red';
 
-/**
- * Filtre temporel à chaud (Round 1). 'all' désactive toute coupure.
- */
 export type TimeFilter = '3d' | '10d' | '30d' | 'all';
+
+export type SourceLanguage = 'fr' | 'en';
 
 export type EventGeometry =
   | { type: 'Point'; coordinates: [number, number] }
@@ -44,4 +43,12 @@ export interface NormalizedEvent {
   startTime?: number;
   endTime?: number;
   polygon?: EventGeometry | null;
+
+  /**
+   * Langue native du contenu tel que publié par la source. Permet à
+   * l'affichage de ne déclencher une traduction que pour le contenu
+   * réellement anglophone (Round 1), sans jamais appeler l'API de
+   * traduction pour des sources déjà francophones.
+   */
+  sourceLanguage?: SourceLanguage;
 }
