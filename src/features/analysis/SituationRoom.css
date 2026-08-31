@@ -1,0 +1,245 @@
+.situation-room {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  color: #d7f5e0;
+  background: #030a12;
+  font-family: 'JetBrains Mono', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
+  container-type: inline-size;
+  container-name: situation;
+}
+
+.situation-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #123322;
+  background: #050f1a;
+}
+
+.tension-gauge {
+  --tension-color: #39ff14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 84px;
+  height: 84px;
+  border: 3px solid var(--tension-color);
+  border-radius: 50%;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--tension-color) 55%, transparent);
+}
+
+.tension-gauge-ring {
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.tension-gauge-value {
+  color: var(--tension-color);
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tension-gauge-label {
+  color: var(--tension-color);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+}
+
+.situation-metrics {
+  display: flex;
+  flex: 1;
+  gap: 18px;
+  overflow-x: auto;
+}
+
+.metric-block {
+  display: grid;
+  gap: 2px;
+  min-width: 84px;
+}
+
+.metric-value {
+  color: #d7f5e0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.metric-label {
+  color: #5f8f78;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.situation-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@container situation (min-width: 620px) {
+  .situation-body {
+    grid-template-columns: minmax(260px, 40fr) minmax(0, 60fr);
+  }
+}
+
+.crisis-list-panel,
+.inspection-panel {
+  min-height: 0;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.crisis-list-panel {
+  border-right: 1px solid #123322;
+  background: #050f1a;
+}
+
+.crisis-list-panel h2,
+.inspection-panel h2 {
+  margin: 0 0 10px;
+  color: #d7f5e0;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.panel-message {
+  color: #5f8f78;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.crisis-list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.crisis-row {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px;
+  color: #d7f5e0;
+  text-align: left;
+  cursor: pointer;
+  background: #0a1c14;
+  border: 1px solid #123322;
+  border-radius: 8px;
+}
+
+.crisis-row.is-selected {
+  border-color: #39ff14;
+  background: #0f2a1c;
+}
+
+.crisis-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.crisis-score {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.crisis-pattern-tag {
+  padding: 2px 6px;
+  color: #5f8f78;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  background: #050f1a;
+  border-radius: 4px;
+}
+
+.crisis-row strong {
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.crisis-row small {
+  color: #5f8f78;
+  font-size: 0.68rem;
+}
+
+.inspection-panel {
+  background: #030a12;
+}
+
+.inspection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.focus-button {
+  padding: 7px 12px;
+  color: #030a12;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: #39ff14;
+  border: none;
+  border-radius: 6px;
+}
+
+.crisis-summary {
+  margin: 0 0 10px;
+  color: #a9c9b8;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.threat-graph-empty {
+  padding: 20px 0;
+  color: #5f8f78;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.threat-graph {
+  display: block;
+  margin: 0 auto;
+}
+
+.threat-graph-node {
+  cursor: default;
+}
+
+.threat-graph-node.is-clickable {
+  cursor: pointer;
+}
+
+.threat-graph-node-label {
+  fill: #d7f5e0;
+  font-family: inherit;
+  font-size: 9px;
+}
+
+.threat-graph-edge-label {
+  fill: #4ca5ff;
+  font-family: inherit;
+  font-size: 9px;
+}
+
+.graph-disclaimer {
+  margin-top: 10px;
+  color: #5f8f78;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
