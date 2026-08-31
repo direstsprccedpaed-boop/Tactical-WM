@@ -174,22 +174,33 @@ function calculateSeismicSeverity(
 function calculateNewsSeverity(title: string, summary: string): number {
   const allText = `${title} ${summary}`.toLowerCase();
 
-  if (/(breaking|urgent|attack|war|missile|guerre|attaque|frappe|catastrophe|meurtrier)/.test(allText)) {
+  if (/(breaking|urgent|attack|war|missile|guerre|attaque|frappe|catastrophe|meurtrier|crash|effondrement)/.test(allText)) {
     return 0.8;
   }
 
-  if (/(warning|sanction|protest|election|alerte|sanction|manifestation|inondation|tempête|tornade)/.test(allText)) {
+  if (/(warning|sanction|protest|election|alerte|sanction|manifestation|inondation|tempête|tornade|pénurie|rupture)/.test(allText)) {
     return 0.45;
   }
 
   return 0.2;
 }
 
+/**
+ * Moteur d'inférence thématique. Ordre de priorité volontaire : les motifs
+ * les plus critiques et les plus spécifiques (conflit, catastrophe) sont
+ * évalués avant les piliers plus généraux (diplomatie, finance) afin de
+ * limiter les faux positifs sur du vocabulaire ambigu ("tension", "crise").
+ */
 function inferCategory(title: string, summary: string): EventCategory {
   const allText = `${title} ${summary}`.toLowerCase();
 
   const conflictPattern = /(war|attack|missile|military|conflict|troops|strike|guerre|attaque|missile|conflit|armée|frappe|offensive)/;
   const disasterPattern = /(flood|storm|tornado|wildfire|hurricane|cyclone|drought|eruption|volcano|landslide|inondation|tempête|tornade|incendie|feu de forêt|ouragan|cyclone|sécheresse|éruption|volcan|glissement de terrain|crue)/;
+  const spacePattern = /(rocket|satellite|launch|orbit|nasa|spacex|esa|starship|falcon 9|fusée|satellite|lancement|orbite|spatial(e)?|astronaute|iss\b)/;
+  const techAiPattern = /(chip|semiconductor|nvidia|artificial intelligence|\bai\b|gpu|processor|puce|semi-conducteur|intelligence artificielle|\bia\b|processeur|algorithme|data center|centre de données)/;
+  const energyPattern = /(oil|barrel|opec|pipeline|refinery|natural gas|pétrole|baril|opep|pipeline|raffinerie|gaz naturel|énergie|nucléaire|nuclear plant)/;
+  const diplomacyPattern = /(summit|treaty|embassy|ambassador|diplomat|negotiation|sommet|traité|ambassade|diplomat(e|ique)|négociation|accord bilatéral|sanctions? diplomatique)/;
+  const financePattern = /(stock market|inflation|central bank|gdp|interest rate|bourse|inflation|banque centrale|pib\b|taux d'intérêt|marché boursier|obligation(s)? d'état)/;
 
   if (conflictPattern.test(allText)) {
     return 'conflict';
@@ -197,6 +208,26 @@ function inferCategory(title: string, summary: string): EventCategory {
 
   if (disasterPattern.test(allText)) {
     return 'disaster';
+  }
+
+  if (spacePattern.test(allText)) {
+    return 'space';
+  }
+
+  if (techAiPattern.test(allText)) {
+    return 'tech_ai';
+  }
+
+  if (energyPattern.test(allText)) {
+    return 'energy';
+  }
+
+  if (diplomacyPattern.test(allText)) {
+    return 'diplomacy';
+  }
+
+  if (financePattern.test(allText)) {
+    return 'finance';
   }
 
   return 'news';
