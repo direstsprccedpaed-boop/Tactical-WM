@@ -4,6 +4,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { useMapEventsLayer } from '@/features/map/useMapEventsLayer';
 import { eventStore } from '@/stores/eventStore';
+import { analysisStore } from '@/stores/analysisStore';
+import { buildCirclePolygon } from '@/core/analysis/crisisPatterns';
 
 interface MapContainerProps {
   className?: string;
@@ -25,8 +27,45 @@ const DEFAULT_CAMERA: CameraSnapshot = {
 };
 
 const BOUNDS_DEBOUNCE_MS = 220;
+const THREAT_SOURCE_ID = 'source-threat-circle';
+const THREAT_FILL_LAYER_ID = 'layer-threat-circle-fill';
+const THREAT_OUTLINE_LAYER_ID = 'layer-threat-circle-outline';
 
 let lastCamera: CameraSnapshot = DEFAULT_CAMERA;
+
+function ensureThreatCircleLayers(map: Map): void {
+  if (!map.getSource(THREAT_SOURCE_ID)) {
+    map.addSource(THREAT_SOURCE_ID, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+  }
+
+  if (!map.getLayer(THREAT_FILL_LAYER_ID)) {
+    map.addLayer({
+      id: THREAT_FILL_LAYER_ID,
+      type: 'fill',
+      source: THREAT_SOURCE_ID,
+      paint: {
+        'fill-color': '#ff2b2b',
+        'fill-opacity': 0.08,
+      },
+    });
+  }
+
+  if (!map.getLayer(THREAT_OUTLINE_LAYER_ID)) {
+    map.addLayer({
+      id: THREAT_OUTLINE_LAYER_ID,
+      type: 'line',
+      source: THREAT_SOURCE_ID,
+      paint: {
+        'line-color': '#ff2b2b',
+        'line-width': 2,
+        'line-dasharray': [2, 1.5],
+      },
+    });
+  }
+}
 
 export function MapContainer({
   className,
@@ -80,10 +119,6 @@ export function MapContainer({
       ]);
     };
 
-    // Round 1 : on ne committe jamais les bounds sur chaque frame de
-    // 'move' (30-60 fois/s pendant l'inertie tactile). Un debounce
-    // arrière-plan hors-React limite le coût, tandis que 'moveend'
-    // committe immédiatement dès la fin réelle du geste.
     const scheduleBoundsCommit = () => {
       if (boundsTimer) {
         clearTimeout(boundsTimer);
@@ -128,10 +163,8 @@ export function MapContainer({
     instance.on('webglcontextlost', onContextLost);
     instance.once('load', commitBounds);
 
-    // Canal impératif "liste → carte" (Round 1/3) : un nonce croissant
-    // permet de redéclencher un flyTo vers la même cible sans dépendre
-    // d'un changement de coordonnées.
     let previousFlyToNonce = eventStore.getState().flyToRequest?.nonce ?? 0;
+    let previousFocusNonce = analysisStore.getState().focusRequest?.nonce ?? 0;
 
     const unsubscribeFlyTo = eventStore.subscribe((state) => {
       const request = state.flyToRequest;
@@ -143,10 +176,6 @@ export function MapContainer({
       previousFlyToNonce = request.nonce;
 
       requestAnimationFrame(() => {
-        // Sécurité écran pliable : si le conteneur vient de repasser de
-        // display:none à display:block (bascule d'onglet compact), les
-        // dimensions internes de MapLibre doivent être recalculées avant
-        // toute animation de caméra.
         if (container.clientWidth > 0 && container.clientHeight > 0) {
           instance.resize();
         }
@@ -160,11 +189,64 @@ export function MapContainer({
       });
     });
 
+    // Canal « Prendre la main » (Round 3) : cadre la carte sur l'emprise
+    // de la crise et dessine un périmètre de menace dynamique.
+    const unsubscribeFocus = analysisStore.subscribe((state) => {
+      const request = state.focusRequest;
+
+      if (!request || request.nonce === previousFocusNonce) {
+        return;
+      }
+
+      previousFocusNonce = request.nonce;
+
+      requestAnimationFrame(() => {
+        if (container.clientWidth > 0 && container.clientHeight > 0) {
+          instance.resize();
+        }
+
+        const runFocus = () => {
+          ensureThreatCircleLayers(instance);
+
+          const source = instance.getSource(THREAT_SOURCE_ID);
+
+          if (source?.type === 'geojson') {
+            source.setData({
+              type: 'FeatureCollection',
+              features: [{
+                type: 'Feature',
+                properties: { label: request.label },
+                geometry: buildCirclePolygon(
+                  request.centerLatitude,
+                  request.centerLongitude,
+                  request.radiusKm,
+                ),
+              }],
+            });
+          }
+
+          const [west, south, east, north] = request.bounds;
+
+          instance.fitBounds(
+            [[west, south], [east, north]],
+            { padding: 48, duration: 900 },
+          );
+        };
+
+        if (instance.isStyleLoaded()) {
+          runFocus();
+        } else {
+          instance.once('load', runFocus);
+        }
+      });
+    });
+
     setMap(instance);
 
     return () => {
       resizeObserver.disconnect();
       unsubscribeFlyTo();
+      unsubscribeFocus();
 
       if (frameId !== null) {
         cancelAnimationFrame(frameId);
