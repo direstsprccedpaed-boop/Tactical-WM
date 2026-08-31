@@ -49,9 +49,6 @@
   height: 100%;
 }
 
-/* Contrôleur tactique ancré en bas : reste accessible au pouce en tenue
-   à deux mains sur l'écran interne déplié, et laisse le haut de la carte
-   totalement dégagé pour l'observation (Round 3). */
 .tactical-controller {
   position: absolute;
   bottom: 10px;
@@ -149,24 +146,54 @@
 }
 
 .intelligence-rail {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
   border-left: 1px solid #1b2a3f;
   background: #0b1728;
 }
 
-.alerts-panel,
-.event-detail {
-  padding: 12px;
+/* Round 2/3 : le splitter occupe toute la hauteur disponible du rail,
+   identique en structure que le rail soit une colonne latérale (large
+   foldable) ou plein écran (onglet compact "Flux"). */
+.vertical-splitter {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+}
+
+.vertical-splitter-pane {
+  min-height: 0;
   overflow: auto;
 }
 
-.event-detail {
-  max-height: 46%;
+.vertical-splitter-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  touch-action: none;
+  background: #0f1c2e;
   border-top: 1px solid #1b2a3f;
-  background: #0d1b2e;
+  border-bottom: 1px solid #1b2a3f;
+}
+
+.vertical-splitter-handle:focus-visible {
+  outline: 2px solid #4ca5ff;
+  outline-offset: -2px;
+}
+
+.vertical-splitter-grip {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: #4ca5ff;
+}
+
+.alerts-panel,
+.event-detail {
+  padding: 12px;
 }
 
 .alerts-panel h2,
@@ -188,9 +215,21 @@
 }
 
 .detail-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: #9fb0c7;
   font-size: 0.72rem;
   text-transform: uppercase;
+}
+
+.lang-badge {
+  padding: 1px 6px;
+  color: #07111f;
+  font-size: 0.62rem;
+  text-transform: none;
+  background: #66b7ff;
+  border-radius: 999px;
 }
 
 .severity-gauge {
@@ -446,15 +485,11 @@
 
   .dashboard-content.compact-map .map-panel,
   .dashboard-content.compact-alerts .intelligence-rail {
-    display: block;
+    display: flex;
     min-height: 0;
   }
 
   .intelligence-rail {
     border-left: 0;
-  }
-
-  .event-detail {
-    max-height: 48%;
   }
 }

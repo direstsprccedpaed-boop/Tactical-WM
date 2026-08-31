@@ -1,7 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { MapContainer } from '@/features/map/MapContainer';
-import type { EventCategory, NormalizedEvent, TimeFilter } from '@/core/domain/NormalizedEvent';
+import { VerticalSplitter } from '@/features/dashboard/VerticalSplitter';
+import { translateToFrench } from '@/core/translation/TranslationService';
+import type {
+  EventCategory,
+  NormalizedEvent,
+  TimeFilter,
+} from '@/core/domain/NormalizedEvent';
 import { type MapLayerId, useEventStore } from '@/stores/eventStore';
 
 import './TacticalDashboard.css';
@@ -66,6 +72,7 @@ const SEVERITY_TIERS: Array<{ max: number; label: string; hex: string }> = [
 ];
 
 const BASEMAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
+const SPLIT_STORAGE_KEY = 'wm-intelligence-split-ratio';
 
 const STOPWORDS = new Set([
   'dans', 'pour', 'avec', 'plus', 'cette', 'sont', 'être', 'leur', 'leurs',
@@ -117,6 +124,185 @@ function extractTags(event: NormalizedEvent): string[] {
     .map(([word]) => word.charAt(0).toUpperCase() + word.slice(1));
 }
 
+/**
+ * Traduit un texte en français uniquement si sa source est anglophone.
+ * Affiche immédiatement le texte original puis bascule en français dès
+ * que la traduction (cache-first) résout — jamais de blocage perceptible
+ * (Round 1).
+ */
+function useFrenchText(text: string, sourceLanguage: 'fr' | 'en' | undefined): string {
+  const [displayed, setDisplayed] = useState(text);
+
+  useEffect(() => {
+    setDisplayed(text);
+
+    if (sourceLanguage !== 'en' || text.trim().length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    translateToFrench(text).then((result) => {
+      if (!cancelled && result.translated) {
+        setDisplayed(result.text);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [text, sourceLanguage]);
+
+  return displayed;
+}
+
+interface EventRowProps {
+  event: NormalizedEvent;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+  onLocate: (id: string) => void;
+}
+
+function EventRow({ event, isSelected, onSelect, onLocate }: EventRowProps) {
+  const title = useFrenchText(event.title, event.sourceLanguage);
+  const tier = getSeverityTier(event.severity);
+
+  return (
+    <li>
+      <div className={isSelected ? 'event-row is-selected' : 'event-row'}>
+        <button
+          type="button"
+          className="event-row-main"
+          onClick={() => onSelect(event.id)}
+        >
+          <span className={`event-category category-${event.category}`}>
+            {CATEGORY_LABELS[event.category]}
+          </span>
+          <strong>{title}</strong>
+          <small style={{ color: tier.hex }}>
+            ● {tier.label} — {Math.round(event.severity * 100)} %
+          </small>
+        </button>
+
+        {event.coordinates && (
+          <button
+            type="button"
+            className="locate-button"
+            onClick={() => onLocate(event.id)}
+            aria-label={`Localiser ${title} sur la carte`}
+          >
+            📍
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+interface DetailPanelProps {
+  event: NormalizedEvent | null;
+  onLocate: (id: string) => void;
+}
+
+function DetailPanel({ event, onLocate }: DetailPanelProps) {
+  const title = useFrenchText(event?.title ?? '', event?.sourceLanguage);
+  const summary = useFrenchText(event?.summary ?? '', event?.sourceLanguage);
+
+  if (!event) {
+    return (
+      <>
+        <h2>Fiche tactique</h2>
+        <p className="panel-message">Sélectionnez un point ou une dépêche.</p>
+      </>
+    );
+  }
+
+  const tier = getSeverityTier(event.severity);
+  const tags = extractTags({ ...event, title, summary });
+
+  return (
+    <>
+      <h2>Fiche tactique</h2>
+
+      <div className="detail-meta-row">
+        <span className={`event-category category-${event.category}`}>
+          {CATEGORY_LABELS[event.category]}
+        </span>
+        <span className="detail-source">
+          {event.sourceLabel ?? event.sourceId}
+          {event.sourceLanguage === 'en' && <span className="lang-badge">Traduit</span>}
+        </span>
+      </div>
+
+      <h3>{title}</h3>
+
+      <div className="severity-gauge">
+        <div className="severity-gauge-track">
+          <div
+            className="severity-gauge-fill"
+            style={{
+              width: `${Math.round(event.severity * 100)}%`,
+              background: tier.hex,
+            }}
+          />
+        </div>
+        <span style={{ color: tier.hex }}>
+          {tier.label} — {Math.round(event.severity * 100)} % ({tier.hex})
+        </span>
+      </div>
+
+      <p>{summary || 'Aucun résumé disponible.'}</p>
+
+      {tags.length > 0 && (
+        <div className="tag-row">
+          {tags.map((tag) => (
+            <span key={tag} className="tag-chip">#{tag}</span>
+          ))}
+        </div>
+      )}
+
+      <dl className="detail-metadata">
+        <dt>Horodatage</dt>
+        <dd>
+          <time dateTime={new Date(event.timestamp).toISOString()}>
+            {new Date(event.timestamp).toLocaleString('fr-FR')}
+          </time>
+        </dd>
+
+        {event.coordinates && (
+          <>
+            <dt>Coordonnées (décimal)</dt>
+            <dd>
+              {event.coordinates[1].toFixed(4)}, {event.coordinates[0].toFixed(4)}
+            </dd>
+
+            <dt>Coordonnées (DMS)</dt>
+            <dd>
+              {toDMS(event.coordinates[1], true)} {toDMS(event.coordinates[0], false)}
+            </dd>
+          </>
+        )}
+      </dl>
+
+      {event.coordinates && (
+        <button
+          type="button"
+          className="locate-button-inline"
+          onClick={() => onLocate(event.id)}
+        >
+          Localiser sur la carte
+        </button>
+      )}
+
+      {event.rawUrl && (
+        <a href={event.rawUrl} target="_blank" rel="noreferrer">
+          Consulter la source
+        </a>
+      )}
+    </>
+  );
+}
+
 export function TacticalDashboard() {
   const [compactTab, setCompactTab] = useState<CompactTab>('map');
   const [controllerOpen, setControllerOpen] = useState(true);
@@ -155,8 +341,43 @@ export function TacticalDashboard() {
     requestFlyTo(eventId, 6.5);
   };
 
-  const selectedTags = selectedEvent ? extractTags(selectedEvent) : [];
-  const selectedTier = selectedEvent ? getSeverityTier(selectedEvent.severity) : null;
+  const alertsList = (
+    <section className="alerts-panel">
+      <h2>Alertes</h2>
+
+      {!hydrated && (
+        <p className="panel-message">Lecture du cache en cours.</p>
+      )}
+
+      {hydrationError && (
+        <p className="panel-message error-message">{hydrationError}</p>
+      )}
+
+      {hydrated && !hydrationError && events.length === 0 && (
+        <p className="panel-message">
+          Aucun événement pour les calques et filtres actifs.
+        </p>
+      )}
+
+      <ul className="event-list">
+        {events.slice(0, 100).map((event) => (
+          <EventRow
+            key={event.id}
+            event={event}
+            isSelected={event.id === selectedEventId}
+            onSelect={selectEvent}
+            onLocate={handleLocate}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+
+  const detailPanel = (
+    <section className="event-detail" aria-live="polite">
+      <DetailPanel event={selectedEvent} onLocate={handleLocate} />
+    </section>
+  );
 
   return (
     <main className="tactical-dashboard">
@@ -264,155 +485,14 @@ export function TacticalDashboard() {
         </section>
 
         <aside className="intelligence-rail">
-          <section className="alerts-panel">
-            <h2>Alertes</h2>
-
-            {!hydrated && (
-              <p className="panel-message">Lecture du cache en cours.</p>
-            )}
-
-            {hydrationError && (
-              <p className="panel-message error-message">{hydrationError}</p>
-            )}
-
-            {hydrated && !hydrationError && events.length === 0 && (
-              <p className="panel-message">
-                Aucun événement pour les calques et filtres actifs.
-              </p>
-            )}
-
-            <ul className="event-list">
-              {events.slice(0, 100).map((event) => {
-                const tier = getSeverityTier(event.severity);
-
-                return (
-                  <li key={event.id}>
-                    <div
-                      className={event.id === selectedEventId ? 'event-row is-selected' : 'event-row'}
-                    >
-                      <button
-                        type="button"
-                        className="event-row-main"
-                        onClick={() => selectEvent(event.id)}
-                      >
-                        <span className={`event-category category-${event.category}`}>
-                          {CATEGORY_LABELS[event.category]}
-                        </span>
-                        <strong>{event.title}</strong>
-                        <small style={{ color: tier.hex }}>
-                          ● {tier.label} — {Math.round(event.severity * 100)} %
-                        </small>
-                      </button>
-
-                      {event.coordinates && (
-                        <button
-                          type="button"
-                          className="locate-button"
-                          onClick={() => handleLocate(event.id)}
-                          aria-label={`Localiser ${event.title} sur la carte`}
-                        >
-                          📍
-                        </button>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-
-          <section className="event-detail" aria-live="polite">
-            <h2>Fiche tactique</h2>
-
-            {selectedEvent ? (
-              <>
-                <div className="detail-meta-row">
-                  <span className={`event-category category-${selectedEvent.category}`}>
-                    {CATEGORY_LABELS[selectedEvent.category]}
-                  </span>
-                  <span className="detail-source">
-                    {selectedEvent.sourceLabel ?? selectedEvent.sourceId}
-                  </span>
-                </div>
-
-                <h3>{selectedEvent.title}</h3>
-
-                {selectedTier && (
-                  <div className="severity-gauge">
-                    <div className="severity-gauge-track">
-                      <div
-                        className="severity-gauge-fill"
-                        style={{
-                          width: `${Math.round(selectedEvent.severity * 100)}%`,
-                          background: selectedTier.hex,
-                        }}
-                      />
-                    </div>
-                    <span style={{ color: selectedTier.hex }}>
-                      {selectedTier.label} — {Math.round(selectedEvent.severity * 100)} % ({selectedTier.hex})
-                    </span>
-                  </div>
-                )}
-
-                <p>{selectedEvent.summary || 'Aucun résumé disponible.'}</p>
-
-                {selectedTags.length > 0 && (
-                  <div className="tag-row">
-                    {selectedTags.map((tag) => (
-                      <span key={tag} className="tag-chip">#{tag}</span>
-                    ))}
-                  </div>
-                )}
-
-                <dl className="detail-metadata">
-                  <dt>Horodatage</dt>
-                  <dd>
-                    <time dateTime={new Date(selectedEvent.timestamp).toISOString()}>
-                      {new Date(selectedEvent.timestamp).toLocaleString('fr-FR')}
-                    </time>
-                  </dd>
-
-                  {selectedEvent.coordinates && (
-                    <>
-                      <dt>Coordonnées (décimal)</dt>
-                      <dd>
-                        {selectedEvent.coordinates[1].toFixed(4)}, {selectedEvent.coordinates[0].toFixed(4)}
-                      </dd>
-
-                      <dt>Coordonnées (DMS)</dt>
-                      <dd>
-                        {toDMS(selectedEvent.coordinates[1], true)} {toDMS(selectedEvent.coordinates[0], false)}
-                      </dd>
-                    </>
-                  )}
-                </dl>
-
-                {selectedEvent.coordinates && (
-                  <button
-                    type="button"
-                    className="locate-button-inline"
-                    onClick={() => handleLocate(selectedEvent.id)}
-                  >
-                    Localiser sur la carte
-                  </button>
-                )}
-
-                {selectedEvent.rawUrl && (
-                  <a
-                    href={selectedEvent.rawUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Consulter la source
-                  </a>
-                )}
-              </>
-            ) : (
-              <p className="panel-message">
-                Sélectionnez un point ou une dépêche.
-              </p>
-            )}
-          </section>
+          <VerticalSplitter
+            top={alertsList}
+            bottom={detailPanel}
+            storageKey={SPLIT_STORAGE_KEY}
+            defaultRatio={0.55}
+            minRatio={0.2}
+            maxRatio={0.8}
+          />
         </aside>
       </section>
     </main>
